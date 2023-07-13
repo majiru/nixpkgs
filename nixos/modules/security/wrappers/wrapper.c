@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,6 +178,17 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot readlink /proc/self/exe: %s", strerror(-self_path_size));
     }
 
+    unsigned int ruid, euid, suid, rgid, egid, sgid;
+    ASSERT(!getresuid(&ruid, &euid, &suid));
+    ASSERT(!getresgid(&rgid, &egid, &sgid));
+
+    // If true, then we did not benefit from setuid privilege escalation,
+    // where the original uid is still in ruid and different from euid == suid.
+    int no_suid = ruid == euid && euid == suid;
+    // If true, then we did not benefit from setgid privilege escalation
+    int no_sgid = rgid == egid && egid == sgid;
+
+
     // Make sure that we are being executed from the right location,
     // i.e., `safe_wrapper_dir'.  This is to prevent someone from creating
     // hard link `X' from some other location, along with a false
@@ -189,15 +201,17 @@ int main(int argc, char **argv) {
     ASSERT('/' == wrapper_dir[0]);
     ASSERT('/' == self_path[len]);
 
-    // Make *really* *really* sure that we were executed as
-    // `self_path', and not, say, as some other setuid program. That
-    // is, our effective uid/gid should match the uid/gid of
-    // `self_path'.
+    // If we got privileges with the fs set[ug]id bit, check that the privilege we
+    // got matches the one one we expected, ie that our effective uid/gid
+    // matches the uid/gid of `self_path`. This ensures that we were executed as
+    // `self_path', and not, say, as some other setuid program.
+    // We don't check that if we did not benefit from the set[ug]id bit, as
+    // can be can be the case in nosuid mounts or user namespaces.
     struct stat st;
     ASSERT(lstat(self_path, &st) != -1);
 
-    ASSERT(!(st.st_mode & S_ISUID) || (st.st_uid == geteuid()));
-    ASSERT(!(st.st_mode & S_ISGID) || (st.st_gid == getegid()));
+    ASSERT(!((st.st_mode & S_ISUID) && !no_suid) || (st.st_uid == geteuid()));
+    ASSERT(!((st.st_mode & S_ISGID) && !no_sgid) || (st.st_gid == getegid()));
 
     // And, of course, we shouldn't be writable.
     ASSERT(!(st.st_mode & (S_IWGRP | S_IWOTH)));
