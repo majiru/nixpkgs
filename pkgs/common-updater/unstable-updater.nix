@@ -12,6 +12,7 @@
 , branch ? null
 , stableVersion ? false # Use version format according to RFC 107 (i.e. LAST_TAG+date=YYYY-MM-DD)
 , tagPrefix ? "" # strip this prefix from a tag name when using stable version
+, deepClone ? false
 }:
 
 let
@@ -22,6 +23,7 @@ let
     branch=""
     use_stable_version=""
     tag_prefix=""
+    deep_clone=""
 
     while (( $# > 0 )); do
         flag="$1"
@@ -38,6 +40,9 @@ let
             ;;
           --tag-prefix=*)
             tag_prefix="''${flag#*=}"
+            ;;
+          --deep-clone)
+            deep_clone=1
             ;;
           *)
             echo "$0: unknown option ‘''${flag}’"
@@ -58,8 +63,11 @@ let
 
     cloneArgs=(
       --bare
-      --depth=1
     )
+
+    if [[ "$deep_clone" != "1" ]]; then
+        cloneArgs+=(--depth=1)
+    fi
 
     if [[ -n "$branch" ]]; then
         cloneArgs+=(--branch="$branch")
@@ -109,4 +117,6 @@ in [
 ] ++ lib.optionals stableVersion [
   "--use-stable-version"
   "--tag-prefix=${tagPrefix}"
+] ++ lib.optionals deepClone [
+  "--deep-clone"
 ]
