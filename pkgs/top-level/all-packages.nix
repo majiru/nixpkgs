@@ -1283,6 +1283,8 @@ with pkgs;
 
   _9pfs = callPackage ../tools/filesystems/9pfs { };
 
+  _9ptls = callPackage ../os-specific/linux/9ptls { };
+
   aaa = callPackage ../tools/misc/aaa { };
 
   aardvark-dns = callPackage ../tools/networking/aardvark-dns { };
